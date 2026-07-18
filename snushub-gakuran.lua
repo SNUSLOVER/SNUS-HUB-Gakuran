@@ -184,7 +184,7 @@ MainTab:CreateSlider({Name = "Forward Range", Range = {15, 38}, Increment = 1, C
 MainTab:CreateSlider({Name = "Base Delay (ms)", Range = {20, 65}, Increment = 2, CurrentValue = 37, Callback = function(v) Config.Delay = v / 1000 end})
 MainTab:CreateToggle({Name = "Velocity Prediction", CurrentValue = true, Callback = function(v) Config.PredictVelocity = v end})
 
-local MusicTab = Window:CreateTab("🎸 Auto Music", 4483362458)
+local MusicTab = Window:CreateTab("🎸 Auto Music (In Work)", 4483362458)
 MusicTab:CreateSection("Advanced Auto Rhythm Player")
 
 MusicTab:CreateToggle({
@@ -224,8 +224,8 @@ MusicTab:CreateToggle({
     Callback = function(v) Config.Randomization = v end
 })
 
-MusicTab:CreateSection("Hinweise")
-MusicTab:CreateParagraph({Title = "Benutzung", Content = "1. Gehe in den Music Room\n2. Nimm das gewünschte Instrument (Gitarre, Bass, Klavier, Drums)\n3. Aktiviere Auto Music\n4. Passe Speed + Instrument an"})
+MusicTab:CreateSection("GUIDE")
+MusicTab:CreateParagraph({Title = "HOW TO USE", Content = "1. Go in the Music room\n2. Take the desired instrument (Guitar, bass, piano, drums)\n3. Activate Auto Music\n4. Adjust Speed + Instrument"})
 
 game:GetService("UserInputService").InputBegan:Connect(function(input)
     if input.KeyCode == Enum.KeyCode.RightShift then
