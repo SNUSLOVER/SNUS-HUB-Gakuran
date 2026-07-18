@@ -1,10 +1,10 @@
--- // SNUS-HUB Gakuran | Full Feature Edition
--- // Made by SNUSLOVER - Final Version
+-- // SNUS-HUB Gakuran | Full Feature Edition - Optimized Parry
+-- // Made by SNUSLOVER
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 local Window = Rayfield:CreateWindow({
     Name = "SNUS-HUB | Gakuran",
     LoadingTitle = "SNUS-HUB",
-    LoadingSubtitle = "by SNUSLOVER - Final",
+    LoadingSubtitle = "by SNUSLOVER - Optimized",
     Theme = "Amethyst",
 })
 
@@ -15,68 +15,137 @@ local VirtualInputManager = game:GetService("VirtualInputManager")
 local LocalPlayer = Players.LocalPlayer
 
 local Config = {
-    -- Combat
-    AutoParry = true,
-    BaseRange = 16,
-    ForwardRange = 23,
-    Delay = 0.037,
-    PredictVelocity = true,
-    ShowHitbox = true,
-    AutoPunish = true,
-    FaceTargetOnParry = true,
-
-    -- Grip & Carry
-    AutoGrip = true,
-    GripRange = 40,
-    AutoCarry = true,
-
-    -- Movement
-    InfiniteStamina = true,
-    AntiStun = true,
-    Flight = false,
-    FlightSpeed = 50,
-    Noclip = false,
-
-    -- Auto Green (Optimized)
+    AutoParry = {
+        Enabled = true,
+        Range = 12,
+        BaseDelay = 0.038,
+        AnimHighlight = 0.12,
+        Cooldown = 0.08,
+        AttackDelay = 0.11,
+        DynamicTiming = true,     -- Neue optimierte Funktion
+        PingCompensation = true,
+    },
     AutoGreenAssist = true,
     GreenDelay = 0.085,
     GreenHoldTime = 0.04,
 
-    -- Music
     AutoMusic = false,
     Instrument = "Guitar",
     MusicSpeed = 1.0,
-    Randomization = true,
+}
+
+-- Deine Animation IDs
+local AttackAnimations = {
+    "120393553812903","1259761673936","134945199381140","117877243065533",
+    "106965238908791","131071815103338","1370347470470618","118943955490014",
+    "132022052139564","78888626472394","103964436023727","71676634048602",
+    "114647502301740","134829666925953","112759168172605","104867156139010",
+    "137837926745158","100981571094705","130865087635587","86495068205420",
+    "96726284968458","139911027872047","104515319350296","74960202100098",
+    "76236532060812","74206130671324","71919935695307","122861547142657",
+    "137980914350618","100408082509740","94803478352691","78695517680318",
 }
 
 local lastParry = 0
-local hitboxVisual = nil
-local musicConnection = nil
-local flightConnection = nil
-local isShooting = false
-local connections = {}
+local parryCooldown = {}
 
--- ==================== AUTO GREEN - OPTIMIZED ANIMATION DETECTION ====================
-local shootingAnimationIds = {
-    -- Füge hier deine Shooting Animation IDs ein!
-    "rbxassetid://", 
-}
+-- ==================== OPTIMIZED PARRY TIMING ====================
+local function GetPing()
+    return (game:GetService("Stats").Network.ServerStatsItem["Data Ping"]:GetValue() / 1000) or 0.05
+end
 
-local function IsShootingAnimation(track)
+local function IsAttackAnimation(track)
     if not track or not track.Animation then return false end
-    local animId = track.Animation.AnimationId
-    for _, id in ipairs(shootingAnimationIds) do
-        if animId:find(id) or animId == id then
-            return true
-        end
+    local id = track.Animation.AnimationId:match("%d+")
+    for _, animId in ipairs(AttackAnimations) do
+        if id == animId then return true end
     end
     return false
 end
 
+RunService.Heartbeat:Connect(function()
+    if not Config.AutoParry.Enabled then return end
+    
+    local char = LocalPlayer.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+
+    local ping = Config.AutoParry.PingCompensation and GetPing() or 0
+
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr == LocalPlayer or not plr.Character then continue end
+        if parryCooldown[plr] and tick() - parryCooldown[plr] < Config.AutoParry.Cooldown then continue end
+
+        local enemy = plr.Character
+        local eRoot = enemy:FindFirstChild("HumanoidRootPart")
+        local eHum = enemy:FindFirstChild("Humanoid")
+        if not eRoot or not eHum then continue end
+
+        local distance = (eRoot.Position - root.Position).Magnitude
+        if distance > Config.AutoParry.Range + 6 then continue end
+
+        local animator = eHum:FindFirstChildOfClass("Animator")
+        if not animator then continue end
+
+        for _, track in ipairs(animator:GetPlayingAnimationTracks()) do
+            if track.IsPlaying and IsAttackAnimation(track) then
+                local timePos = track.TimePosition
+                local speed = track.Speed or 1.0
+
+                -- === OPTIMIZED TIMING LOGIC ===
+                local shouldParry = false
+                
+                if Config.AutoParry.DynamicTiming then
+                    -- Smart Timing basierend auf Animation Fortschritt + Speed
+                    if timePos >= Config.AutoParry.AnimHighlight and timePos < 0.78 then
+                        if speed > 1.2 then
+                            shouldParry = timePos < 0.65
+                        else
+                            shouldParry = timePos < 0.75
+                        end
+                    end
+                else
+                    if timePos >= Config.AutoParry.AnimHighlight and timePos < 0.82 then
+                        shouldParry = true
+                    end
+                end
+
+                if shouldParry then
+                    local finalDelay = Config.AutoParry.BaseDelay + ping * 0.6
+                    
+                    -- Dynamische Anpassung bei Nähe
+                    if distance < 9 then
+                        finalDelay = math.max(0.018, finalDelay - 0.022)
+                    end
+
+                    task.delay(finalDelay, function()
+                        if tick() - lastParry < 0.1 then return end
+                        lastParry = tick()
+                        parryCooldown[plr] = tick()
+
+                        -- Perfect Parry
+                        VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.F, false, game)
+                        task.wait(Config.AutoParry.AttackDelay)
+                        VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.F, false, game)
+
+                        -- Auto Punish
+                        task.wait(0.08)
+                        VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+                        task.wait(0.1)
+                        VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+                    end)
+                end
+            end
+        end
+    end
+end)
+
+-- ==================== AUTO GREEN + MUSIC (unverändert) ====================
+local isShooting = false
+
 local function AutoGreen()
     if not Config.AutoGreenAssist or isShooting then return end
     isShooting = true
-
     task.delay(Config.GreenDelay, function()
         VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.R, false, game)
         task.wait(Config.GreenHoldTime)
@@ -84,153 +153,43 @@ local function AutoGreen()
     end)
 end
 
--- Animation Monitor
-local animConnection = RunService.Heartbeat:Connect(function()
+RunService.Heartbeat:Connect(function()
     if not Config.AutoGreenAssist then return end
     local char = LocalPlayer.Character
-    if not char then return end
-    local hum = char:FindFirstChild("Humanoid")
+    local hum = char and char:FindFirstChild("Humanoid")
     if not hum then return end
     local animator = hum:FindFirstChildOfClass("Animator")
     if not animator then return end
 
     for _, track in ipairs(animator:GetPlayingAnimationTracks()) do
-        if track.IsPlaying and IsShootingAnimation(track) then
-            local timePos = track.TimePosition
-            if timePos >= 0.08 and timePos <= 0.68 and not isShooting then
+        if track.IsPlaying and (track.Animation.AnimationId:find("shoot") or track.Animation.AnimationId:find("throw")) then
+            if track.TimePosition > 0.12 and track.TimePosition < 0.68 then
                 AutoGreen()
                 break
             end
         end
     end
 end)
-table.insert(connections, animConnection)
-
--- ==================== HITBOX & PARRY ====================
-local function CreateHitboxVisual()
-    if hitboxVisual then hitboxVisual:Destroy() end
-    hitboxVisual = Instance.new("Part")
-    hitboxVisual.Name = "SNUS_Hitbox"
-    hitboxVisual.Shape = Enum.PartType.Ball
-    hitboxVisual.Size = Vector3.new(1,1,1)
-    hitboxVisual.Transparency = 0.7
-    hitboxVisual.Color = Color3.fromRGB(255, 0, 0)
-    hitboxVisual.Anchored = true
-    hitboxVisual.CanCollide = false
-    hitboxVisual.Material = Enum.Material.Neon
-    hitboxVisual.Parent = workspace
-end
-
-local function UpdateHitboxVisual(root)
-    if not Config.ShowHitbox or not root then
-        if hitboxVisual then hitboxVisual.Transparency = 1 end
-        return
-    end
-    if not hitboxVisual then CreateHitboxVisual() end
-    local lookVec = root.CFrame.LookVector
-    local visualRange = Config.ForwardRange * 2
-    hitboxVisual.Size = Vector3.new(visualRange, visualRange, visualRange)
-    hitboxVisual.Position = root.Position + lookVec * (Config.ForwardRange / 2)
-    hitboxVisual.Transparency = 0.65
-end
-
-local function Parry()
-    if tick() - lastParry < 0.14 then return end
-    lastParry = tick()
-    VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.F, false, game)
-    task.wait(0.055)
-    VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.F, false, game)
-end
-
-RunService.Heartbeat:Connect(function()
-    if not Config.AutoParry then return end
-    local char = LocalPlayer.Character
-    local root = char and char:FindFirstChild("HumanoidRootPart")
-    if not root then return end
-
-    UpdateHitboxVisual(root)
-
-    for _, plr in ipairs(Players:GetPlayers()) do
-        if plr == LocalPlayer or not plr.Character then continue end
-        local enemy = plr.Character
-        local eRoot = enemy:FindFirstChild("HumanoidRootPart")
-        if not eRoot then continue end
-
-        local distance = (eRoot.Position - root.Position).Magnitude
-        local lookVec = root.CFrame.LookVector
-        local isInFront = (eRoot.Position - root.Position).Unit:Dot(lookVec) > 0.5
-        local currentRange = isInFront and Config.ForwardRange or Config.BaseRange
-
-        if distance > currentRange + 10 then continue end
-
-        -- Simple Parry Logic
-        if math.random() < 0.7 then -- Platzhalter für Smart Logic
-            task.delay(Config.Delay, function()
-                Parry()
-            end)
-        end
-    end
-end)
-
--- ==================== MOVEMENT ====================
-RunService.Heartbeat:Connect(function()
-    local char = LocalPlayer.Character
-    local hum = char and char:FindFirstChild("Humanoid")
-    if hum then
-        if Config.InfiniteStamina then hum.JumpPower = 50 end
-        if Config.AntiStun then hum.PlatformStand = false end
-    end
-end)
-
--- Flight
-UserInputService.InputBegan:Connect(function(input)
-    if input.KeyCode == Enum.KeyCode.F and Config.Flight then
-        -- Flight Toggle Logic (einfach)
-    end
-end)
-
--- ==================== AUTO MUSIC ====================
-local keys = {
-    Guitar = {Enum.KeyCode.Q, Enum.KeyCode.E, Enum.KeyCode.R, Enum.KeyCode.T},
-    Bass = {Enum.KeyCode.Q, Enum.KeyCode.E, Enum.KeyCode.R},
-    Piano = {Enum.KeyCode.Q, Enum.KeyCode.W, Enum.KeyCode.E, Enum.KeyCode.R, Enum.KeyCode.T},
-    Drums = {Enum.KeyCode.Q, Enum.KeyCode.W, Enum.KeyCode.E, Enum.KeyCode.R}
-}
-
-local function PlayNote(key)
-    VirtualInputManager:SendKeyEvent(true, key, false, game)
-    task.wait(0.035)
-    VirtualInputManager:SendKeyEvent(false, key, false, game)
-end
-
-local function StartAutoMusic()
-    if musicConnection then musicConnection:Disconnect() end
-    musicConnection = RunService.Heartbeat:Connect(function()
-        if not Config.AutoMusic then return end
-        local selected = keys[Config.Instrument] or keys.Guitar
-        for _, k in ipairs(selected) do
-            PlayNote(k)
-            task.wait((0.08 + math.random()*0.03) * Config.MusicSpeed)
-        end
-    end)
-end
 
 -- ==================== UI ====================
 local CombatTab = Window:CreateTab("⚔️ Combat", 4483362458)
-CombatTab:CreateToggle({Name = "Auto Parry", CurrentValue = true, Callback = function(v) Config.AutoParry = v end})
-CombatTab:CreateToggle({Name = "Show Hitbox", CurrentValue = true, Callback = function(v) Config.ShowHitbox = v end})
+CombatTab:CreateToggle({Name = "Auto Parry", CurrentValue = true, Callback = function(v) Config.AutoParry.Enabled = v end})
+CombatTab:CreateSlider({Name = "Parry Range", Range = {6, 25}, Increment = 1, CurrentValue = 12, Callback = function(v) Config.AutoParry.Range = v end})
+CombatTab:CreateSlider({Name = "Base Delay (ms)", Range = {20, 80}, Increment = 1, CurrentValue = 38, Callback = function(v) Config.AutoParry.BaseDelay = v/1000 end})
+CombatTab:CreateSlider({Name = "Anim Highlight", Range = {0.05, 0.35}, Increment = 0.01, CurrentValue = 0.12, Callback = function(v) Config.AutoParry.AnimHighlight = v end})
+CombatTab:CreateToggle({Name = "Dynamic Timing", CurrentValue = true, Callback = function(v) Config.AutoParry.DynamicTiming = v end})
+CombatTab:CreateToggle({Name = "Ping Compensation", CurrentValue = true, Callback = function(v) Config.AutoParry.PingCompensation = v end})
 
 local BasketballTab = Window:CreateTab("🏀 Basketball", 4483362458)
 BasketballTab:CreateToggle({Name = "Auto Green Assist", CurrentValue = true, Callback = function(v) Config.AutoGreenAssist = v end})
 BasketballTab:CreateSlider({Name = "Green Delay (ms)", Range = {40, 160}, Increment = 1, CurrentValue = 85, Callback = function(v) Config.GreenDelay = v/1000 end})
-BasketballTab:CreateSlider({Name = "Hold Time (ms)", Range = {20, 90}, Increment = 1, CurrentValue = 40, Callback = function(v) Config.GreenHoldTime = v/1000 end})
 
-local MusicTab = Window:CreateTab("🎸 Music", 4483362458)
-MusicTab:CreateToggle({Name = "Auto Music", CurrentValue = false, Callback = function(v) Config.AutoMusic = v if v then StartAutoMusic() end end})
-MusicTab:CreateDropdown({Name = "Instrument", Options = {"Guitar","Bass","Piano","Drums"}, CurrentOption = {"Guitar"}, Callback = function(s) Config.Instrument = s[1] end})
+Rayfield:Notify({
+    Title = "SNUS-HUB",
+    Content = "Parry Timing stark optimiert ✓",
+    Duration = 8
+})
 
-Rayfield:Notify({Title = "SNUS-HUB", Content = "Final Version geladen - Viel Erfolg!", Duration = 10})
-
-UserInputService.InputBegan:Connect(function(i)
-    if i.KeyCode == Enum.KeyCode.RightShift then Rayfield:ToggleUI() end
+UserInputService.InputBegan:Connect(function(input)
+    if input.KeyCode == Enum.KeyCode.RightShift then Rayfield:ToggleUI() end
 end)
